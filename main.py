@@ -106,6 +106,7 @@ class Main(plugin.Plugin):
             b64encode(open(str(self.infile.text()).strip(), "rb").read()),
             '"')))))
 
+
         class TransientWidget(QWidget):
             ' persistant widget thingy '
             def __init__(self, widget_list):
@@ -114,6 +115,7 @@ class Main(plugin.Plugin):
                 vbox = QVBoxLayout(self)
                 for each_widget in widget_list:
                     vbox.addWidget(each_widget)
+
 
         tw = TransientWidget((QLabel('<i>Encode file as plain text string</i>'),
             QLabel(linesep + ' File to Encode: '), self.infile, self.open,
