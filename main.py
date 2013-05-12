@@ -89,7 +89,7 @@ class Main(plugin.Plugin):
         self.open.clicked.connect(lambda: self.infile.setText(str(
             QFileDialog.getOpenFileName(self.dock, "Open a File to Encode...",
             path.expanduser("~"),
-            ';;'.join(['(*.%s)' % e for e in ['jpg', 'png', 'webp', '*']])))))
+            ';;'.join(['(*.%s)' % e for e in ['*', 'jpg', 'png', 'webp']])))))
 
         self.output = QPlainTextEdit('''
         We can only see a short distance ahead,
@@ -106,7 +106,6 @@ class Main(plugin.Plugin):
             b64encode(open(str(self.infile.text()).strip(), "rb").read()),
             '"')))))
 
-
         class TransientWidget(QWidget):
             ' persistant widget thingy '
             def __init__(self, widget_list):
@@ -115,7 +114,6 @@ class Main(plugin.Plugin):
                 vbox = QVBoxLayout(self)
                 for each_widget in widget_list:
                     vbox.addWidget(each_widget)
-
 
         tw = TransientWidget((QLabel('<i>Encode file as plain text string</i>'),
             QLabel(linesep + ' File to Encode: '), self.infile, self.open,
