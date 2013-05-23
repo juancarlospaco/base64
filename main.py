@@ -18,12 +18,12 @@
 
 # metadata
 " Base64 Data URI Encoder "
-__version__ = ' 0.1 '
+__version__ = ' 0.2 '
 __license__ = ' GPL '
 __author__ = ' juancarlospaco '
 __email__ = ' juancarlospaco@ubuntu.com '
 __url__ = ''
-__date__ = ' 15/05/2013 '
+__date__ = ' 15/06/2013 '
 __prj__ = ' base64 '
 __docformat__ = 'html'
 __source__ = ''
@@ -31,33 +31,29 @@ __full_licence__ = ''
 
 
 # imports
-from os import path
-from os import linesep
+from os import path, linesep
 from base64 import b64encode
 from mimetypes import guess_type
+from sip import setapi
 
-from PyQt4.QtGui import QLabel
-from PyQt4.QtGui import QCompleter
-from PyQt4.QtGui import QDirModel
-from PyQt4.QtGui import QPushButton
-from PyQt4.QtGui import QFileDialog
-from PyQt4.QtGui import QWidget
-from PyQt4.QtGui import QDockWidget
-from PyQt4.QtGui import QVBoxLayout
-from PyQt4.QtGui import QSizePolicy
-from PyQt4.QtGui import QCursor
-from PyQt4.QtGui import QLineEdit
-from PyQt4.QtGui import QIcon
+from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
+  QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon)
+
+from PyQt4.QtCore import Qt, QDir
+
 try:
     from PyKDE4.kdeui import KTextEdit as QPlainTextEdit
 except ImportError:
     from PyQt4.QtGui import QPlainTextEdit  # lint:ok
 
-from PyQt4.QtCore import Qt
-from PyQt4.QtCore import QDir
 
 from ninja_ide.gui.explorer.explorer_container import ExplorerContainer
 from ninja_ide.core import plugin
+
+
+# API 2
+(setapi(a, 2) for a in ("QDate", "QDateTime", "QString", "QTime", "QUrl",
+                        "QTextStream", "QVariant"))
 
 
 # constans
@@ -89,7 +85,8 @@ class Main(plugin.Plugin):
         self.open.clicked.connect(lambda: self.infile.setText(str(
             QFileDialog.getOpenFileName(self.dock, "Open a File to Encode...",
             path.expanduser("~"),
-            ';;'.join(['(*.%s)' % e for e in ['*', 'jpg', 'png', 'webp']])))))
+            ';;'.join(['(*.{})'.format(e)
+            for e in ['*', 'jpg', 'png', 'webp', 'svg', 'gif', 'webm']])))))
 
         self.output = QPlainTextEdit('''
         We can only see a short distance ahead,
