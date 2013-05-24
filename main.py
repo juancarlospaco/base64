@@ -37,7 +37,8 @@ from mimetypes import guess_type
 from sip import setapi
 
 from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
-  QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon)
+  QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon,
+  QCheckBox)
 
 from PyQt4.QtCore import Qt, QDir
 
@@ -87,6 +88,8 @@ class Main(plugin.Plugin):
             path.expanduser("~"),
             ';;'.join(['(*.{})'.format(e)
             for e in ['*', 'jpg', 'png', 'webp', 'svg', 'gif', 'webm']])))))
+        self.checkbox = QCheckBox(' Use basic Caesar Cipher (ROT13)')
+        self.checkbox.setToolTip(' Use "string".decode("rot13") to Decipher ! ')
 
         self.output = QPlainTextEdit('''
         We can only see a short distance ahead,
@@ -96,12 +99,7 @@ class Main(plugin.Plugin):
 
         self.button = QPushButton(QIcon.fromTheme("face-smile"), ' OK ! ')
         self.button.setCursor(QCursor(Qt.PointingHandCursor))
-        self.button.clicked.connect(lambda: self.output.setText(str(''.join((
-            '"data:',
-            guess_type(str(self.infile.text()).strip(), strict=False)[0],
-            ';base64,',
-            b64encode(open(str(self.infile.text()).strip(), "rb").read()),
-            '"')))))
+        self.button.clicked.connect(self.run)
 
         class TransientWidget(QWidget):
             ' persistant widget thingy '
@@ -114,8 +112,8 @@ class Main(plugin.Plugin):
 
         tw = TransientWidget((QLabel('<i>Encode file as plain text string</i>'),
             QLabel(linesep + ' File to Encode: '), self.infile, self.open,
-            QLabel(linesep + ' Base64 String Output: '), self.output,
-            self.button,
+            self.checkbox, QLabel(linesep + ' Base64 String Output: '),
+            self.output, self.button,
         ))
         self.dock = QDockWidget()
         self.dock.setFeatures(QDockWidget.DockWidgetFloatable |
@@ -124,6 +122,16 @@ class Main(plugin.Plugin):
         self.dock.setStyleSheet('QDockWidget::title{text-align: center;}')
         self.dock.setWidget(tw)
         ec.addTab(self.dock, "Base64")
+
+    def run(self):
+        ' run the encoding '
+        output = ''.join(('"data:',
+            guess_type(str(self.infile.text()).strip(), strict=False)[0],
+            ';base64,',
+            b64encode(open(str(self.infile.text()).strip(), "rb").read()), '"'))
+        if self.checkbox.isChecked() is True:
+            output = str(output).encode('rot13')
+        self.output.setText(output)
 
 
 ###############################################################################
