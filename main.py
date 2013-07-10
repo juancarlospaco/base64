@@ -38,7 +38,7 @@ from sip import setapi
 
 from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
   QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon,
-  QCheckBox, QDialog)
+  QCheckBox, QDialog, QGraphicsDropShadowEffect, QColor)
 
 from PyQt4.QtCore import Qt, QDir
 
@@ -97,9 +97,26 @@ class Main(plugin.Plugin):
         - Alan Turing ''')
         self.output.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        self.button = QPushButton(QIcon.fromTheme("face-smile"), ' OK ! ')
+        self.button = QPushButton(QIcon.fromTheme("face-cool"), 'Encode BASE64')
         self.button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.button.setMinimumSize(100, 50)
         self.button.clicked.connect(self.run)
+
+        def must_glow(widget_list):
+            ' apply an glow effect to the widget '
+            for glow, each_widget in enumerate(widget_list):
+                try:
+                    if each_widget.graphicsEffect() is None:
+                        glow = QGraphicsDropShadowEffect(self)
+                        glow.setOffset(0)
+                        glow.setBlurRadius(99)
+                        glow.setColor(QColor(99, 255, 255))
+                        each_widget.setGraphicsEffect(glow)
+                        glow.setEnabled(True)
+                except:
+                    pass
+
+        must_glow((self.button, ))
 
         class TransientWidget(QWidget):
             ' persistant widget thingy '
