@@ -18,12 +18,12 @@
 
 # metadata
 " Base64 Data URI Encoder "
-__version__ = ' 0.2 '
+__version__ = ' 0.4 '
 __license__ = ' GPL '
 __author__ = ' juancarlospaco '
 __email__ = ' juancarlospaco@ubuntu.com '
 __url__ = ''
-__date__ = ' 15/06/2013 '
+__date__ = ' 15/07/2013 '
 __prj__ = ' base64 '
 __docformat__ = 'html'
 __source__ = ''
@@ -38,7 +38,7 @@ from sip import setapi
 
 from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
   QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon,
-  QCheckBox)
+  QCheckBox, QDialog)
 
 from PyQt4.QtCore import Qt, QDir
 
@@ -116,8 +116,6 @@ class Main(plugin.Plugin):
             self.output, self.button,
         ))
         self.dock = QDockWidget()
-        self.dock.setFeatures(QDockWidget.DockWidgetFloatable |
-                              QDockWidget.DockWidgetMovable)
         self.dock.setWindowTitle(__doc__)
         self.dock.setStyleSheet('QDockWidget::title{text-align: center;}')
         self.dock.setWidget(tw)
@@ -125,13 +123,27 @@ class Main(plugin.Plugin):
 
     def run(self):
         ' run the encoding '
-        output = ''.join(('"data:',
-            guess_type(str(self.infile.text()).strip(), strict=False)[0],
-            ';base64,',
-            b64encode(open(str(self.infile.text()).strip(), "rb").read()), '"'))
+        mimetype = guess_type(str(self.infile.text()).strip(), strict=False)[0]
+        _mime = mimetype if mimetype is not None else self.ask_mime()
+        output = '"data:{};base64,{}"'.format(_mime,
+            b64encode(open(str(self.infile.text()).strip(), "rb").read()))
         if self.checkbox.isChecked() is True:
             output = str(output).encode('rot13')
         self.output.setText(output)
+
+    def ask_mime(self):
+        ' ask user for mime type '
+        dialog = QDialog(self.dock)
+        textInput = QLineEdit('application/octet-stream')
+        textInput.setPlaceholderText(' Write a MIME-Type Here ')
+        ok = QPushButton(' O K ')
+        ok.clicked.connect(dialog.close)
+        ly = QVBoxLayout()
+        [ly.addWidget(wdgt) for wdgt in (QLabel('<b>Auto MIME-Type Failed !'),
+            QLabel('<i>Please write a MIME-Type for the File:'), textInput, ok)]
+        dialog.setLayout(ly)
+        dialog.exec_()
+        return str(textInput.text()).strip().lower()
 
 
 ###############################################################################
