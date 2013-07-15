@@ -18,7 +18,7 @@
 
 # metadata
 " Base64 Data URI Encoder "
-__version__ = ' 0.4 '
+__version__ = ' 0.6 '
 __license__ = ' GPL '
 __author__ = ' juancarlospaco '
 __email__ = ' juancarlospaco@ubuntu.com '
@@ -38,7 +38,7 @@ from sip import setapi
 
 from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
   QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon,
-  QCheckBox, QDialog, QGraphicsDropShadowEffect, QColor)
+  QCheckBox, QDialog, QGraphicsDropShadowEffect, QColor, QApplication)
 
 from PyQt4.QtCore import Qt, QDir
 
@@ -88,8 +88,11 @@ class Main(plugin.Plugin):
             path.expanduser("~"),
             ';;'.join(['(*.{})'.format(e)
             for e in ['*', 'jpg', 'png', 'webp', 'svg', 'gif', 'webm']])))))
-        self.checkbox = QCheckBox(' Use basic Caesar Cipher (ROT13)')
-        self.checkbox.setToolTip(' Use "string".decode("rot13") to Decipher ! ')
+        self.chckbx1 = QCheckBox(' Use basic Caesar Cipher (ROT13)')
+        self.chckbx1.setToolTip(' Use "string".decode("rot13") to Decipher ! ')
+        self.chckbx2 = QCheckBox(' Use "data:type/subtype;base64,..."')
+        self.chckbx2.setChecked(True)
+        self.chckbx3 = QCheckBox(' Copy encoded output to Clipboard')
 
         self.output = QPlainTextEdit('''
         We can only see a short distance ahead,
@@ -129,8 +132,9 @@ class Main(plugin.Plugin):
 
         tw = TransientWidget((QLabel('<i>Encode file as plain text string</i>'),
             QLabel(linesep + ' File to Encode: '), self.infile, self.open,
-            self.checkbox, QLabel(linesep + ' Base64 String Output: '),
-            self.output, self.button,
+            self.chckbx2, self.chckbx3, self.chckbx1,
+            QLabel(linesep + ' Base64 String Output: '), self.output,
+            self.button,
         ))
         self.dock = QDockWidget()
         self.dock.setWindowTitle(__doc__)
@@ -142,10 +146,16 @@ class Main(plugin.Plugin):
         ' run the encoding '
         mimetype = guess_type(str(self.infile.text()).strip(), strict=False)[0]
         _mime = mimetype if mimetype is not None else self.ask_mime()
-        output = '"data:{};base64,{}"'.format(_mime,
-            b64encode(open(str(self.infile.text()).strip(), "rb").read()))
-        if self.checkbox.isChecked() is True:
+        output = '"{}{}{}{}"'.format(
+            'data:' if self.chckbx2.isChecked() is True else '',
+            _mime if self.chckbx2.isChecked() is True else '',
+            ';base64,' if self.chckbx2.isChecked() is True else '',
+            b64encode(open(str(
+            self.infile.text()).strip().replace('file:///', '/'), "rb").read()))
+        if self.chckbx1.isChecked() is True:
             output = str(output).encode('rot13')
+        if self.chckbx3.isChecked() is True:
+            QApplication.clipboard().setText(output)
         self.output.setText(output)
 
     def ask_mime(self):
