@@ -17,13 +17,13 @@
 
 
 # metadata
-" Base64 Data URI Encoder "
-__version__ = ' 0.6 '
+" Base64 Encoder "
+__version__ = ' 1.4 '
 __license__ = ' GPL '
 __author__ = ' juancarlospaco '
 __email__ = ' juancarlospaco@ubuntu.com '
 __url__ = ''
-__date__ = ' 15/07/2013 '
+__date__ = ' 30/10/2013 '
 __prj__ = ' base64 '
 __docformat__ = 'html'
 __source__ = ''
@@ -31,21 +31,24 @@ __full_licence__ = ''
 
 
 # imports
-from os import path, linesep
+from os import path, sep
 from base64 import b64encode
 from mimetypes import guess_type
 from sip import setapi
+from getpass import getuser
+from datetime import datetime
 
 from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
-  QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit, QIcon,
-  QCheckBox, QDialog, QGraphicsDropShadowEffect, QColor, QApplication)
+    QFileDialog, QDockWidget, QVBoxLayout, QSizePolicy, QCursor, QLineEdit,
+    QIcon, QCheckBox, QGraphicsDropShadowEffect, QColor, QApplication, QMenu,
+    QMessageBox, QScrollArea, QInputDialog, QComboBox)
 
 from PyQt4.QtCore import Qt, QDir
 
 try:
-    from PyKDE4.kdeui import KTextEdit as QPlainTextEdit
+    from PyKDE4.kdeui import KTextEdit as QTextEdit
 except ImportError:
-    from PyQt4.QtGui import QPlainTextEdit  # lint:ok
+    from PyQt4.QtGui import QTextEdit  # lint:ok
 
 
 from ninja_ide.gui.explorer.explorer_container import ExplorerContainer
@@ -58,6 +61,23 @@ from ninja_ide.core import plugin
 
 
 # constans
+PY_EMBED = '''#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+# imports
+from base64 import decodestring
+from cStringIO import StringIO
+
+
+#metadata
+__author__ = ' {} '
+__date__ = ' {} '
+
+
+embedded_file = StringIO(decodestring({}))
+print(embedded_file.read())
+'''
 
 
 ###############################################################################
@@ -67,34 +87,40 @@ class Main(plugin.Plugin):
     " Main Class "
     def initialize(self, *args, **kwargs):
         " Init Main Class "
-        ec = ExplorerContainer()
         super(Main, self).initialize(*args, **kwargs)
-
         self.infile = QLineEdit(path.expanduser("~"))
         self.infile.setPlaceholderText(' /full/path/to/file ')
         # directory auto completer
-        self.completer = QCompleter(self)
-        self.dirs = QDirModel(self)
+        self.completer, self.dirs = QCompleter(self), QDirModel(self)
         self.dirs.setFilter(QDir.AllEntries | QDir.NoDotAndDotDot)
         self.completer.setModel(self.dirs)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setCompletionMode(QCompleter.PopupCompletion)
         self.infile.setCompleter(self.completer)
 
+        menu = QMenu('Base64')
+        menu.addAction('Encode This File', lambda: self.encode_this())
+        self.ex_locator = self.locator.get_service('explorer')
+        self.ex_locator.add_project_menu(menu, lang='all')
+
         self.open = QPushButton(QIcon.fromTheme("folder-open"), 'Open')
         self.open.setCursor(QCursor(Qt.PointingHandCursor))
         self.open.clicked.connect(lambda: self.infile.setText(str(
             QFileDialog.getOpenFileName(self.dock, "Open a File to Encode...",
-            path.expanduser("~"),
-            ';;'.join(['(*.{})'.format(e)
+            path.expanduser("~"), ';;'.join(['{}(*.{})'.format(e.upper(), e)
             for e in ['*', 'jpg', 'png', 'webp', 'svg', 'gif', 'webm']])))))
         self.chckbx1 = QCheckBox(' Use basic Caesar Cipher (ROT13)')
         self.chckbx1.setToolTip(' Use "string".decode("rot13") to Decipher ! ')
         self.chckbx2 = QCheckBox(' Use "data:type/subtype;base64,..."')
         self.chckbx2.setChecked(True)
         self.chckbx3 = QCheckBox(' Copy encoded output to Clipboard')
+        self.combo1 = QComboBox()
+        self.combo1.addItems(['Do Not Generate Code', 'Generate CSS embed Code',
+            'Generate Python Embed Code', 'Generate HTML embed Code',
+            'Generate JS embed Code', 'Generate QML embed Code'])
+        self.combo1.currentIndexChanged.connect(self.combo_changed)
 
-        self.output = QPlainTextEdit('''
+        self.output = QTextEdit('''
         We can only see a short distance ahead,
         but we can see plenty there that needs to be done.
         - Alan Turing ''')
@@ -104,22 +130,12 @@ class Main(plugin.Plugin):
         self.button.setCursor(QCursor(Qt.PointingHandCursor))
         self.button.setMinimumSize(100, 50)
         self.button.clicked.connect(self.run)
-
-        def must_glow(widget_list):
-            ' apply an glow effect to the widget '
-            for glow, each_widget in enumerate(widget_list):
-                try:
-                    if each_widget.graphicsEffect() is None:
-                        glow = QGraphicsDropShadowEffect(self)
-                        glow.setOffset(0)
-                        glow.setBlurRadius(99)
-                        glow.setColor(QColor(99, 255, 255))
-                        each_widget.setGraphicsEffect(glow)
-                        glow.setEnabled(True)
-                except:
-                    pass
-
-        must_glow((self.button, ))
+        glow = QGraphicsDropShadowEffect(self)
+        glow.setOffset(0)
+        glow.setBlurRadius(99)
+        glow.setColor(QColor(99, 255, 255))
+        self.button.setGraphicsEffect(glow)
+        glow.setEnabled(True)
 
         class TransientWidget(QWidget):
             ' persistant widget thingy '
@@ -131,46 +147,81 @@ class Main(plugin.Plugin):
                     vbox.addWidget(each_widget)
 
         tw = TransientWidget((QLabel('<i>Encode file as plain text string</i>'),
-            QLabel(linesep + ' File to Encode: '), self.infile, self.open,
-            self.chckbx2, self.chckbx3, self.chckbx1,
-            QLabel(linesep + ' Base64 String Output: '), self.output,
+            QLabel('<b>File to Encode:'), self.infile, self.open, self.chckbx2,
+            self.chckbx3, self.chckbx1, QLabel('<b>Embedding Template Code:'),
+            self.combo1, QLabel(' <b>Base64 String Output: '), self.output,
             self.button,
         ))
-        self.dock = QDockWidget()
+        self.scrollable, self.dock = QScrollArea(), QDockWidget()
+        self.scrollable.setWidgetResizable(True)
+        self.scrollable.setWidget(tw)
         self.dock.setWindowTitle(__doc__)
         self.dock.setStyleSheet('QDockWidget::title{text-align: center;}')
-        self.dock.setWidget(tw)
-        ec.addTab(self.dock, "Base64")
+        self.dock.setWidget(self.scrollable)
+        ExplorerContainer().addTab(self.dock, "Base64")
+        QPushButton(QIcon.fromTheme("help-about"), 'About', self.dock
+        ).clicked.connect(lambda: QMessageBox.information(self.dock, __doc__,
+        ''.join((__doc__, __version__, __license__, 'by', __author__, __email__)
+        )))
+
+    def encode_this(self):
+        ' encode file from contextual submenu '
+        if self.ex_locator.get_current_project_item().isFolder is not True:
+            self.infile.setText(
+                    self.ex_locator.get_current_project_item().get_full_path())
+            self.run()
+        else:
+            QMessageBox.information(self.dock, __doc__, '''<b style="color:red">
+            WARNING!: The selected item is a Folder not a File, Aborting !.''')
 
     def run(self):
         ' run the encoding '
         mimetype = guess_type(str(self.infile.text()).strip(), strict=False)[0]
         _mime = mimetype if mimetype is not None else self.ask_mime()
+        fle = str(self.infile.text()).strip().replace('file:///', '/')
+        if int(path.getsize(fle)) / 1024 / 1024 >= 1:
+            QMessageBox.information(self.dock, __doc__,
+            '''<b style="color:red"> WARNING!: File size is > 1 Megabyte!,<br>
+            this will take some time, depending your CPU Processing power!.''')
         output = '"{}{}{}{}"'.format(
             'data:' if self.chckbx2.isChecked() is True else '',
             _mime if self.chckbx2.isChecked() is True else '',
-            ';base64,' if self.chckbx2.isChecked() is True else '',
-            b64encode(open(str(
-            self.infile.text()).strip().replace('file:///', '/'), "rb").read()))
+           ';charset=utf-8;base64,' if self.chckbx2.isChecked() is True else '',
+            b64encode(open(fle, "rb").read()))
+        if self.combo1.currentIndex() is 1:
+            output = ('html, body { margin:0; padding:0; background: url(' +
+            output + ') no-repeat center center fixed; background-size:cover }')
+        elif self.combo1.currentIndex() is 2:
+            output = PY_EMBED.format(getuser(),
+                     datetime.now().isoformat().split('.')[0], output)
+        elif self.combo1.currentIndex() is 3:
+            output = '<img src={} alt="{}" title="{}"/>'.format(output,
+                     fle.split(sep)[-1], fle.split(sep)[-1])
+        elif self.combo1.currentIndex() is 4:
+            output = 'var embedded_file = window.atob({}); '.format(output)
+        elif self.combo1.currentIndex() is 5:
+            output = 'Image { source: ' + output + ' } '
         if self.chckbx1.isChecked() is True:
             output = str(output).encode('rot13')
         if self.chckbx3.isChecked() is True:
             QApplication.clipboard().setText(output)
-        self.output.setText(output)
+        self.output.setPlainText(output)
+        self.output.setFocus()
+        self.output.selectAll()
 
     def ask_mime(self):
         ' ask user for mime type '
-        dialog = QDialog(self.dock)
-        textInput = QLineEdit('application/octet-stream')
-        textInput.setPlaceholderText(' Write a MIME-Type Here ')
-        ok = QPushButton(' O K ')
-        ok.clicked.connect(dialog.close)
-        ly = QVBoxLayout()
-        [ly.addWidget(wdgt) for wdgt in (QLabel('<b>Auto MIME-Type Failed !'),
-            QLabel('<i>Please write a MIME-Type for the File:'), textInput, ok)]
-        dialog.setLayout(ly)
-        dialog.exec_()
-        return str(textInput.text()).strip().lower()
+        return str(QInputDialog.getText(self.dock, __doc__, 'Write a MIME-Type',
+               QLineEdit.Normal, 'application/octet-stream')[0]).strip().lower()
+
+    def combo_changed(self):
+        ' on combo changed '
+        if self.combo1.currentIndex() is 1 or self.combo1.currentIndex() is 3:
+            self.chckbx1.setChecked(False)
+            self.chckbx2.setChecked(True)
+        elif self.combo1.currentIndex() is 2 or self.combo1.currentIndex() is 4:
+            self.chckbx1.setChecked(False)
+            self.chckbx2.setChecked(False)
 
 
 ###############################################################################
